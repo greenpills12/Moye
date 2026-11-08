@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;background:#000;overflow:hidden}canvas{display:block;width:100vw;height:100vh;image-rendering:pixelated}</style></head><body>
+<canvas id="c"></canvas>
+<script>
+// 15 s pixel-art intro for ZOYA. Internal 320x180, scaled with nearest neighbour.
+const W=320,H=180,cv=document.getElementById('c');cv.width=W;cv.height=H;const g=cv.getContext('2d');g.imageSmoothingEnabled=false;
+window.DUR=15;
+const rnd=(s=>()=>(s=(s*16807)%2147483647)/2147483647)(7);
+const stars=[...Array(140)].map(()=>({x:rnd()*W,y:rnd()*110,b:rnd(),p:rnd()*6}));
+const cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)), ease=x=>x*x*(3-2*x), seg=(t,a,b)=>ease(cl((t-a)/(b-a)));
+// 5x7 pixel font
+const F={Z:["11111","00001","00010","00100","01000","10000","11111"],O:["01110","10001","10001","10001","10001","10001","01110"],Y:["10001","10001","01010","00100","00100","00100","00100"],A:["01110","10001","10001","11111","10001","10001","10001"],
+P:["11110","10001","10001","11110","10000","10000","10000"],R:["11110","10001","10001","11110","10100","10010","10001"],E:["11111","10000","10000","11110","10000","10000","11111"],S:["01111","10000","10000","01110","00001","00001","11110"],T:["11111","00100","00100","00100","00100","00100","00100"],' ':["00000","00000","00000","00000","00000","00000","00000"]};
+function txt(s,x,y,sc,col){g.fillStyle=col;[...s].forEach((ch,i)=>F[ch].forEach((r,j)=>[...r].forEach((v,k)=>{if(v=='1')g.fillRect(x+(i*6+k)*sc,y+j*sc,sc,sc)})))}
+// title pixels as particles
+const TS=7,tw=(4*6-1)*TS,tx0=Math.round((W-tw)/2),ty0=46,parts=[];
+[..."ZOYA"].forEach((ch,i)=>F[ch].forEach((r,j)=>[...r].forEach((v,k)=>{if(v=='1')for(let a=0;a<TS;a+=TS)parts.push({x:tx0+(i*6+k)*TS,y:ty0+j*TS,sx:rnd()*W,sy:rnd()*H*1.4-40,d:rnd()*0.8})})));
+function ridge(base,amp,f,ph,col){g.fillStyle=col;for(let x=0;x<W;x+=2){const h=base+Math.round((Math.sin(x*f+ph)*amp+Math.sin(x*f*2.7+ph*3)*amp*.4)/2)*2;g.fillRect(x,h,2,H-h)}}
+// hero sprite 8x14, cloak flutters on 2 frames
+const HERO=[["..aa....",".aaaa...",".asss...",".asss...","..cc....",".cccc...","cccccc..","cccccc..","ccccccc.",".cccccc.",".cccccc.","..d.d...","..d.d...",".dd.dd.."],
+["..aa....",".aaaa...",".asss...",".asss...","..cc....",".ccccc..","ccccccc.","cccccccc","ccccccc.",".cccccc.",".cccccc.","..d.d...","..d.d...",".dd.dd.."]];
+const HC={a:'#2a1830',s:'#f2c7a5',c:'#e4405f',d:'#2a1830'};
+function hero(x,y,fr){HERO[fr].forEach((r,j)=>[...r].forEach((v,k)=>{if(v!='.'){g.fillStyle=HC[v];g.fillRect(x+k,y+j,1,1)}}))}
+window.render=function(t){
+  // sky: night → dawn
+  const dawn=seg(t,3,11);
+  const sky=g.createLinearGradient(0,0,0,H);sky.addColorStop(0,`rgb(${12+30*dawn},${10+14*dawn},${38+30*dawn})`);sky.addColorStop(1,`rgb(${40+170*dawn},${30+70*dawn},${70+20*dawn})`);
+  g.fillStyle=sky;g.fillRect(0,0,W,H);
+  stars.forEach(s=>{const a=(0.4+0.6*Math.abs(Math.sin(t*1.5+s.p)))*s.b*(1-dawn*0.8);g.fillStyle=`rgba(255,240,220,${a})`;g.fillRect(Math.round(s.x),Math.round(s.y),1,1)});
+  // moon rising
+  const my=Math.round(120-50*seg(t,0.5,9));g.fillStyle='#ffe6b0';g.beginPath();g.arc(278,my,14,0,7);g.fill();g.fillStyle='rgba(255,230,176,.12)';g.beginPath();g.arc(278,my,24,0,7);g.fill();
+  // camera pan: slow rise
+  const cy=Math.round(30*(1-seg(t,0,6)));
+  g.save();g.translate(0,cy);
+  ridge(118,10,.03,t*0+1,'#3b2a5c');ridge(132,8,.05,2,'#2b1d45');ridge(146,6,.08,4,'#1a1030');
+  // cliff and hero
+  g.fillStyle='#120a22';g.fillRect(0,150,120,40);for(let x=120;x<136;x+=2)g.fillRect(x,150+(x-120),2,40);
+  const fr=Math.floor(t*2)%2;hero(70,136,fr);
+  // scarf trail
+  g.fillStyle='#e4405f';for(let i=0;i<5;i++)g.fillRect(70-1-i,141+Math.round(Math.sin(t*6-i)*1),1,1);
+  g.restore();
+  // fireflies
+  for(let i=0;i<18;i++){const x=(i*53+t*8*(1+i%3))%W,y=150-((i*37+t*5)%60)+Math.sin(t*2+i)*3;g.fillStyle=`rgba(255,220,120,${0.5+0.5*Math.sin(t*4+i)})`;g.fillRect(Math.round(x),Math.round(y),1,1)}
+  // title assembles 5.5 → 8.5
+  if(t>5){parts.forEach(p=>{const k=seg(t,5.5+p.d,7.6+p.d);const x=p.sx+(p.x-p.sx)*k,y=p.sy+(p.y-p.sy)*k;
+    g.fillStyle='#4a1020';g.fillRect(Math.round(x)+1,Math.round(y)+2,TS,TS);g.fillStyle=k>=1?'#ffd36b':`rgba(255,${180+70*k},120,${0.3+0.7*k})`;g.fillRect(Math.round(x),Math.round(y),TS-(k>=1?0:3),TS-(k>=1?0:3))});}
+  // flash at lock-in
+  const fl=Math.max(0,1-Math.abs(t-8.7)/0.35);if(fl>0){g.fillStyle=`rgba(255,250,230,${fl*0.7})`;g.fillRect(0,0,W,H)}
+  // shine sweep across title
+  if(t>9&&t<10.5){const sx=tx0-20+(tw+40)*seg(t,9,10.4);g.fillStyle='rgba(255,255,255,.55)';for(let j=0;j<7*TS;j++)g.fillRect(Math.round(sx+j*0.4),ty0+j,3,1)}
+  // PRESS START blink
+  if(t>10.8){const on=Math.floor((t-10.8)*2.2)%2==0||t>13.6;if(on)txt("PRESS START",Math.round((W-(11*6-1)*1)/2),118,1,'#fff4dc')}
+  // letterbox fade in/out
+  const fade=Math.max(1-seg(t,0,1.2),seg(t,14,15));g.fillStyle=`rgba(0,0,0,${fade})`;g.fillRect(0,0,W,H);
+};
+window.render(0);window.READY=true;
+</script></body></html>
